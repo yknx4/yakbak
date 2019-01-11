@@ -33,6 +33,7 @@ var handler = yakbak('http://api.flickr.com', {
 
 - `dirname` the path where recorded responses will be written (required).
 - `noRecord` if true, requests will return a 404 error if the tape doesn't exist
+- `recordOnlySuccess` if true, only successful requests (response status code = 2XX) will be recorded
 - `hash(req, body)` provide your own IncomingMessage hash function
 
 ### with node's http module
@@ -63,16 +64,40 @@ var flickr = yakbak('http://api.flickr.com', {
 });
 
 var upload = yakbak('http://up.flickr.com', {
+  recordOnlySuccess: true,
 	dirname: __dirname + '/tapes'
 });
 
-express().use(function (req, res, next) {
+var app = express()
+
+app.use(function (req, res, next) {
 	if (req.path.indexOf('/services/upload') === 0) {
 	  upload(req, res);
 	} else {
 	  flickr(req, res);
 	}
-}).listen(3000);
+})
+
+function logErrors (err, req, res, next) {
+  console.error(err.stack)
+  next(err)
+}
+app.use(logErrors)
+function clientErrorHandler (err, req, res, next) {
+  if (req.xhr) {
+    res.status(500).send({ error: 'Something failed!' })
+  } else {
+    next(err)
+  }
+}
+app.use(clientErrorHandler)
+function errorHandler (err, req, res, next) {
+  res.status(500)
+  res.render('error', { error: err })
+}
+app.use(errorHandler)
+
+app.listen(3000);
 ```
 
 ### as a standalone response server
