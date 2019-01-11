@@ -13,6 +13,10 @@ var curl = require('./lib/curl');
 var debug = require('debug')('yakbak:server');
 var fs = require('fs');
 
+function isValidStatusCode(code) {
+  return code >= 200 && code < 400
+}
+
 /**
  * Returns a new yakbak proxy middleware.
  * @param {String} host The hostname to proxy to
@@ -57,7 +61,7 @@ module.exports = function (host, opts) {
         } else {
           return proxy(req, body, host).then(function (pres) {
             if (opts.recordOnlySuccess === true) {
-                if (successfulResCodePattern.test(pres.statusCode)) {
+                if (isValidStatusCode(pres.statusCode)) {
                    return record(pres.req, pres, file);
                 } else {
                   throw new RecordingDisabledError('Only Successful responses will be recorded');
