@@ -37,7 +37,6 @@ module.exports = function (host, opts) {
 
     return buffer(req).then(function (body) {
       var file = path.join(opts.dirname, tapename(req, body));
-      var successfulResCodePattern = /^[2][0|2][0-8]$/;
 
       return Promise.try(function () {
         var fileName = require.resolve(file);
@@ -64,7 +63,7 @@ module.exports = function (host, opts) {
                 if (isValidStatusCode(pres.statusCode)) {
                    return record(pres.req, pres, file);
                 } else {
-                  throw new RecordingDisabledError('Only Successful responses will be recorded');
+                  throw new InvalidStatusCodeError('Only Successful responses will be recorded', pres);
                 }
             } else {
               return record(pres.req, pres, file);
@@ -78,12 +77,14 @@ module.exports = function (host, opts) {
     }).then(function (tape) {
       return tape(req, res);
     }).catch(RecordingDisabledError, function (err) {
-      /* eslint-disable no-console */
-      console.log(err.message);
-      console.log(curl.request(req));
-      /* eslint-enable no-console */
+      debug(err.message);
+      debug(curl.request(req));
       res.statusCode = err.status;
       res.end(err.message);
+    }).catch(InvalidStatusCodeError, function (err) {
+      debug(err.message);
+      debug(curl.request(req));
+      err.res.pipe(res, { end: true });
     });
 
   };
@@ -122,6 +123,12 @@ function ModuleNotFoundError(err) {
 function RecordingDisabledError(message) {
   this.message = message;
   this.status = 404;
+}
+
+function InvalidStatusCodeError(message, res) {
+  this.message = message;
+  this.status = 404;
+  this.res = res;
 }
 
 RecordingDisabledError.prototype = Object.create(Error.prototype);
